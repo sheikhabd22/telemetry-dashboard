@@ -1,39 +1,33 @@
+from flask import Flask
+from flask_socketio import SocketIO, emit
 import serial
-import time
+import threading
 
-# Set up the serial connection (adjust the port and baud rate)
-# Ensure you have the correct COM port for your system
-# For example, on Windows, it might be "COM3"; on Linux, it might be "/dev/ttyUSB0"
-arduino_port = 'COM3'  # Update this to the correct serial port for your Arduino
-baud_rate = 9600       # Match the baud rate in Arduino sketch
+app = Flask(__name__)
+socketio = SocketIO(app)
 
-# Open the serial port
-arduino = serial.Serial(arduino_port, baud_rate, timeout=1)
-time.sleep(2)  # Wait for the connection to establish
+# Setup serial connection to Arduino (use correct port for your system)
+ser = serial.Serial('COM3', 9600)  # Replace with your Arduino's port
 
-# File where we will store the sensor data
-file_path = "sensor_data.txt"
-
-# Function to store the data into a file
-def store_data(data):
-    with open(file_path, "a") as file:
-        file.write(data + "\n")
-
-# Function to read data from the Arduino and store it
-def read_and_store_data():
+# Function to read data from Arduino and emit it to the frontend
+def read_from_arduino():
     while True:
-        if arduino.in_waiting > 0:
-            # Read the data from Arduino
-            data = arduino.readline().decode('utf-8').strip()
-            
-            # Store the data in the file
-            store_data(data)
-            print(f"Data saved: {data}")
+        if ser.in_waiting > 0:
+            sensor_value = ser.readline().decode('utf-8').strip()
+            socketio.emit('sensor_data', {'sensor_data': sensor_value})
 
-# Start reading and storing data
-try:
-    read_and_store_data()
-except KeyboardInterrupt:
-    print("Program interrupted. Exiting...")
-finally:
-    arduino.close()
+# Route to start reading from Arduino
+@app.route('/')
+def index():
+    return 'Flask-SocketIO Arduino Data Stream'
+
+# Run the background thread that reads from Arduino and emits the data
+@socketio.on('connect')
+def handle_connect():
+    print('Client connected')
+    thread = threading.Thread(target=read_from_arduino)
+    thread.daemon = True
+    thread.start()
+
+if __name__ == '__main__':
+    socketio.run(app, debug=True)
