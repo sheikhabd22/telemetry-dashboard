@@ -16,7 +16,7 @@ export function RocketTelemetry() {
 
   useEffect(() => {
     // Connect to WebSocket
-    const ws = new WebSocket('ws://localhost:8000/ws/telemetry')
+    const ws = new WebSocket('ws://192.xxx.xxx.x:8000/ws/telemetry')
     
     ws.onmessage = (event) => {
       const newDataPoint = JSON.parse(event.data)
@@ -53,6 +53,11 @@ export function RocketTelemetry() {
     : 0;
   const currentAltitude = latestData ? Number(latestData.altitude) : 0;
   const currentVelocity = latestData ? Number(latestData.velocity) : 0;
+  const tempBaro = latestData ? Number(latestData.temp_baro) : 0;
+  const tempIMU = latestData ? Number(latestData.temp_imu) : 0;
+  const accel = latestData && latestData.accel ? latestData.accel : { x: 0, y: 0, z: 0 };
+  const gyro = latestData && latestData.gyro ? latestData.gyro : { x: 0, y: 0, z: 0 };
+  const mag = latestData && latestData.mag ? latestData.mag : { x: 0, y: 0, z: 0 };
 
   const getFlightStage = (altitude: number, velocity: number) => {
     if (altitude < 10 && velocity < 10) return "Pre-launch"
@@ -302,6 +307,98 @@ export function RocketTelemetry() {
                 </div>
               ))}
             </ScrollArea>
+          </CardContent>
+        </Card>
+
+        <Card className="border-gray-800 bg-gray-900">
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2 text-white">
+              <Thermometer className="h-5 w-5 text-red-400" />
+              Barometer Temperature
+            </CardTitle>
+          </CardHeader>
+          <CardContent>
+            <div className="text-2xl font-mono text-white">{tempBaro.toFixed(2)} °C</div>
+          </CardContent>
+        </Card>
+        <Card className="border-gray-800 bg-gray-900">
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2 text-white">
+              <Thermometer className="h-5 w-5 text-orange-400" />
+              IMU Temperature
+            </CardTitle>
+          </CardHeader>
+          <CardContent>
+            <div className="text-2xl font-mono text-white">{tempIMU.toFixed(2)} °C</div>
+          </CardContent>
+        </Card>
+        <Card className="border-gray-800 bg-gray-900 col-span-full">
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2 text-white">
+              <Wind className="h-5 w-5 text-cyan-400" />
+              Accelerometer (m/s²)
+            </CardTitle>
+          </CardHeader>
+          <CardContent>
+            <div className="h-[200px]">
+              <ResponsiveContainer width="100%" height="100%">
+                <LineChart data={data}>
+                  <CartesianGrid strokeDasharray="3 3" stroke="#333" />
+                  <XAxis dataKey="time" stroke="#666" />
+                  <YAxis stroke="#666" />
+                  <Tooltip content={<CustomTooltip />} />
+                  <Line type="monotone" dataKey="accel.x" stroke="#3b82f6" strokeWidth={2} dot={false} name="X" />
+                  <Line type="monotone" dataKey="accel.y" stroke="#16a34a" strokeWidth={2} dot={false} name="Y" />
+                  <Line type="monotone" dataKey="accel.z" stroke="#dc2626" strokeWidth={2} dot={false} name="Z" />
+                </LineChart>
+              </ResponsiveContainer>
+            </div>
+          </CardContent>
+        </Card>
+        <Card className="border-gray-800 bg-gray-900 col-span-full">
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2 text-white">
+              <Compass className="h-5 w-5 text-yellow-400" />
+              Gyroscope (°/s)
+            </CardTitle>
+          </CardHeader>
+          <CardContent>
+            <div className="h-[200px]">
+              <ResponsiveContainer width="100%" height="100%">
+                <LineChart data={data}>
+                  <CartesianGrid strokeDasharray="3 3" stroke="#333" />
+                  <XAxis dataKey="time" stroke="#666" />
+                  <YAxis stroke="#666" />
+                  <Tooltip content={<CustomTooltip />} />
+                  <Line type="monotone" dataKey="gyro.x" stroke="#3b82f6" strokeWidth={2} dot={false} name="X" />
+                  <Line type="monotone" dataKey="gyro.y" stroke="#16a34a" strokeWidth={2} dot={false} name="Y" />
+                  <Line type="monotone" dataKey="gyro.z" stroke="#dc2626" strokeWidth={2} dot={false} name="Z" />
+                </LineChart>
+              </ResponsiveContainer>
+            </div>
+          </CardContent>
+        </Card>
+        <Card className="border-gray-800 bg-gray-900 col-span-full">
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2 text-white">
+              <Radio className="h-5 w-5 text-purple-400" />
+              Magnetometer (µT)
+            </CardTitle>
+          </CardHeader>
+          <CardContent>
+            <div className="h-[200px]">
+              <ResponsiveContainer width="100%" height="100%">
+                <LineChart data={data}>
+                  <CartesianGrid strokeDasharray="3 3" stroke="#333" />
+                  <XAxis dataKey="time" stroke="#666" />
+                  <YAxis stroke="#666" />
+                  <Tooltip content={<CustomTooltip />} />
+                  <Line type="monotone" dataKey="mag.x" stroke="#3b82f6" strokeWidth={2} dot={false} name="X" />
+                  <Line type="monotone" dataKey="mag.y" stroke="#16a34a" strokeWidth={2} dot={false} name="Y" />
+                  <Line type="monotone" dataKey="mag.z" stroke="#dc2626" strokeWidth={2} dot={false} name="Z" />
+                </LineChart>
+              </ResponsiveContainer>
+            </div>
           </CardContent>
         </Card>
       </div>

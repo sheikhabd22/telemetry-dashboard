@@ -1,9 +1,9 @@
-from fastapi import FastAPI, WebSocket
+from fastapi import FastAPI, WebSocket, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 import asyncio
-import random
-import json
 from datetime import datetime
+from typing import List, Dict, Any
+from pydantic import BaseModel
 
 app = FastAPI()
 
@@ -16,56 +16,55 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-class TelemetryGenerator:
-    def __init__(self):
-        self.flight_time = 0
-        self.last_altitude = 0  # Start at ground level
-        self.last_velocity = 0  # Start at rest
-        self.thrust_phase = True  # Add thrust phase flag
-        self.thrust_duration = 30  # Thrust for first 30 seconds
-        
-    def generate_data_point(self):
-        # Simulate rocket thrust during initial phase
-        if self.flight_time < self.thrust_duration:
-            thrust_acceleration = 20  # m/s²
-            self.last_velocity += thrust_acceleration * 0.1
-        
-        # Add some realistic variations
-        self.last_altitude += self.last_velocity * 0.1
-        
-        # Simulate gravity and air resistance
-        self.last_velocity -= 9.81 * 0.1  # Gravity effect
-        self.last_velocity *= 0.99  # Air resistance
-        
-        # Prevent unrealistic ground penetration
-        if self.last_altitude <= 0:
-            self.last_altitude = 0
-            self.last_velocity = 0
-        
-        self.flight_time += 1
-        
-        return {
-            "time": self.flight_time,
-            "altitude": max(0, self.last_altitude),
-            "velocity": self.last_velocity,
-            "temperature": random.uniform(20, 50),
-            "pressure": 1013.25 * pow(2.718, (-self.last_altitude / 7400)),
-            "timestamp": datetime.now().isoformat()
-        }
+# Store the latest telemetry data
+latest_telemetry: Dict[str, Any] = {}
+
+# WebSocket connections
+active_connections: List[WebSocket] = []
+
+class Vec3(BaseModel):
+    x: float
+    y: float
+    z: float
+
+class TelemetryData(BaseModel):
+    altitude: float
+    pressure: float
+    temp_baro: float
+    accel: Vec3
+    gyro: Vec3
+    mag: Vec3
+    temp_imu: float
+
+@app.post("/telemetry")
+async def receive_telemetry(data: TelemetryData):
+    global latest_telemetry
+    latest_telemetry = data.dict()
+    latest_telemetry["timestamp"] = datetime.now().isoformat()
+    latest_telemetry["time"] = datetime.now().timestamp()
+    
+    # Broadcast to all connected WebSocket clients
+    for connection in active_connections:
+        try:
+            await connection.send_json(latest_telemetry)
+        except:
+            active_connections.remove(connection)
+    
+    return {"status": "success"}
 
 @app.websocket("/ws/telemetry")
 async def websocket_endpoint(websocket: WebSocket):
     await websocket.accept()
-    telemetry = TelemetryGenerator()
+    active_connections.append(websocket)
     
     try:
         while True:
-            data = telemetry.generate_data_point()
-            await websocket.send_json(data)
+            await websocket.send_json(latest_telemetry)
             await asyncio.sleep(1)  # Send data every second
     except Exception as e:
         print(f"WebSocket error: {e}")
     finally:
+        active_connections.remove(websocket)
         await websocket.close()
 
 @app.get("/")
